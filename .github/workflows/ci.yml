@@ -1,0 +1,52 @@
+
+name: CI - Desafio DevOps
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v4
+
+      - name: Construir imagem Docker
+        run: docker build -t desafio-devops:v1 .
+
+      - name: Iniciar container
+        run: docker run -d --name desafio-web -p 8080:80 desafio-devops:v1
+
+      - name: Validar aplicacao
+        run: |
+          for tentativa in {1..10}; do
+            status=$(curl -sS -o resposta.html -w "%{http_code}" http://127.0.0.1:8080) || status="000"
+
+            if [ "$status" = "200" ]; then
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$status" != "200" ]; then
+            echo "Erro: HTTP $status"
+            exit 1
+          fi
+
+          grep -q "Meu primeiro desafio DevOps" resposta.html
+
+      - name: Remover container
+        if: always()
+        run: docker rm -f desafio-web || true
